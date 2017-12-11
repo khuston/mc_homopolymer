@@ -16,6 +16,16 @@ static gsl_vector * y; // working vector (N)
 static gsl_vector * bl; // working matrix (N-1)
 static double V; // working double
 
+static double s;   // polymer-wall interaction length
+static double eps; // polymer-wall interaction energy
+static double V_prefactor;
+static const double twofifths = 2.0/5.0;
+static double const1;
+static double const2;
+
+int true = 1;
+int false = 0;
+
 
 void print_matrix (gsl_matrix * m)
 {
@@ -62,7 +72,7 @@ int end_rotate (gsl_matrix * m, int rotation_type)
 {
     int i;
     int direction = gsl_rng_uniform_int(r, 2);
-    // Rotation type 1 produces a random rotation
+    // Rotation type 1 produces a random orientation
     if (rotation_type == 1)
     {
         set_random_unit_vector(v);
@@ -76,7 +86,7 @@ int end_rotate (gsl_matrix * m, int rotation_type)
         gsl_vector_view row = gsl_matrix_row(m, i);
         gsl_vector_add(&row.vector, v);
 
-      return 0;
+        return i;
     }
   return -1; // Unrecognized rotation type
 }
@@ -84,45 +94,38 @@ int end_rotate (gsl_matrix * m, int rotation_type)
 
 void slither (gsl_matrix * m)
 {
-    int i, j, N;
+    int i, j, k, N, offset;
     int direction = gsl_rng_uniform_int(r, 2);
     N = m->size1;
     if (direction == 0)
     {
+        k = 0;
+        offset = -1;
         /* Shift all bead positions up 1, effectively destroying the (n-1)th bead.
          * A new end bead will be created at the 0th position. */
         for (i = N-1; i > 0; i--)
             for (j = 0; j < 3; j++)
-                gsl_matrix_set(m, i, j, gsl_matrix_get(m, i-1, j));
-
-        /* Set new end bead to same position as adjacent bead.
-         * Then displace it by a unit vector. */
-        for (j = 0; j < 3; j++)
-            gsl_matrix_set(m, 0, j, gsl_matrix_get(m, 1, j));
-
-        set_random_unit_vector(v);
-        gsl_vector_view row = gsl_matrix_row(m, 0);
-        gsl_vector_add(&row.vector, v);
+                gsl_matrix_set(m, i, j, gsl_matrix_get(m, i + offset, j));
     }
     else if (direction == 1)
     {
+        k = N-1;
+        offset = 1;
         /* Shift all bead positions down 1, effectively destroying the 0th bead.
          * A new end bead will be created at the (n-1)th position. */
         for (i = 0; i < N-1; i++)
             for (j = 0; j < 3; j++)
-                gsl_matrix_set(m, i, j, gsl_matrix_get(m, i+1, j));
-
-        /* Set new end bead to same position as adjacent bead.
-         * Then displace it by a unit vector. */
-        for (j = 0; j < 3; j++)
-            gsl_matrix_set(m, N-1, j, gsl_matrix_get(m, N-2, j));
-
-        set_random_unit_vector(v);
-        gsl_vector_view row = gsl_matrix_row(m, N-1);
-        gsl_vector_add(&row.vector, v);
-
+                gsl_matrix_set(m, i, j, gsl_matrix_get(m, i + offset, j));
     }
 
+    /* Set new end bead to same position as adjacent bead.
+     * Then displace it by a unit vector. */
+    for (j = 0; j < 3; j++)
+        gsl_matrix_set(m, k, j, gsl_matrix_get(m, k - offset, j));
+
+    set_random_unit_vector(v);
+    gsl_vector_view row = gsl_matrix_row(m, k);
+    gsl_vector_add(&row.vector, v);
 }
 
 
@@ -162,15 +165,14 @@ void rotate_around_points (gsl_matrix * m, gsl_vector * a0, gsl_vector * ar, dou
     for (i = 0; i < m->size1; i++)
         row = gsl_matrix_row(&B_sub.matrix, i);
         gsl_vector_sub(&row.vector, a0);
-    gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, &B_sub.matrix, Q, 0.0, &B_sub.matrix);
+    gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, &B_sub.matrix, Q, 0.0, m);
     for (i = 0; i < m->size1; i++)
-        row = gsl_matrix_row(&B_sub.matrix, i);
+        row = gsl_matrix_row(m, i);
         gsl_vector_add(&row.vector, a0);
-    gsl_matrix_swap(m, &B_sub.matrix);
 }
 
 
-void crankshaft (gsl_matrix * m)
+int crankshaft (gsl_matrix * m)
 {
     int N = m->size1;
     int k = gsl_rng_uniform_int(r, N-1);
@@ -194,6 +196,8 @@ void crankshaft (gsl_matrix * m)
     gsl_matrix_view m_sub = gsl_matrix_submatrix(m, k, 0, 2, 3);
     rotate_around_points(&m_sub.matrix, &a0.vector, &ar.vector, theta);
 
+    return k;
+
     //gsl_vector_memcpy(axis, &ar.vector);
     //gsl_vector_sub(axis, &a0.vector);
     //gsl_vector_scale(axis, 1.0/gsl_blas_dnrm2(axis));
@@ -215,22 +219,20 @@ void crankshaft (gsl_matrix * m)
 }
 
 
-void bond_lengths (gsl_matrix * m, gsl_vector * b)
-{
+void bond_lengths (gsl_vector * b, gsl_matrix * m) {
     int i, j;
 
-    for (i = 1; i < b->size; i++)
-    {
-        for (j = 0; j < 3; j++)
-            gsl_matrix_set(B, i, j, gsl_matrix_get(m, i, j) - gsl_matrix_get(m, i-1, j));
+    for (i = 0; i < b->size; i++) {
+        for (j = 0; j < 3; j++) {
+            gsl_matrix_set(B, i, j, gsl_matrix_get(m, i+1, j) - gsl_matrix_get(m, i, j));
+        }
         gsl_vector_view row = gsl_matrix_row (B, i);
         gsl_vector_set(b, i, gsl_blas_dnrm2(&row.vector));
     }
 }
 
 
-int pivot (gsl_matrix * m)
-{
+int pivot (gsl_matrix * m) {
     int i, j;
     int N = m->size1;
     int k = gsl_rng_uniform_int(r, N-2);
@@ -331,39 +333,118 @@ int pivot (gsl_matrix * m)
 }
 
 
-void init_matrix (gsl_matrix * m)
-{
+void init_matrix (gsl_matrix * m) {
   int i;
 
   for (i = 0; i < m->size1; i++)
   {
-    gsl_matrix_set (m, i, 0, 1.0*i);
+    gsl_matrix_set (m, i, 0, 0.0);
     gsl_matrix_set (m, i, 1, 1.0*sin(i/2.0));
-    gsl_matrix_set (m, i, 2, 0.0);
+    gsl_matrix_set (m, i, 2, 1.0+1.0*i);
   }
 }
 
+void init_matrix2 (gsl_matrix * m) {
+  gsl_matrix_set(m, 0, 0, 0.0);
+  gsl_matrix_set(m, 0, 1, 0.0);
+  gsl_matrix_set(m, 0, 2, 0.0);
 
-double evaluate_V (gsl_matrix * m)
-{
+  gsl_matrix_set(m, 1, 0, 1.0);
+  gsl_matrix_set(m, 1, 1, 0.0);
+  gsl_matrix_set(m, 1, 2, 0.0);
+
+  gsl_matrix_set(m, 2, 0, 2.0);
+  gsl_matrix_set(m, 2, 1, 1.0);
+  gsl_matrix_set(m, 2, 2, 0.0);
+
+  gsl_matrix_set(m, 3, 0, 3.0);
+  gsl_matrix_set(m, 3, 1, 1.0);
+  gsl_matrix_set(m, 3, 2, 0.0);
+
+  gsl_matrix_set(m, 4, 0, 4.0);
+  gsl_matrix_set(m, 4, 1, 0.0);
+  gsl_matrix_set(m, 4, 2, 0.0);
+
+  gsl_matrix_set(m, 5, 0, 5.0);
+  gsl_matrix_set(m, 5, 1, 0.0);
+  gsl_matrix_set(m, 5, 2, 0.0);
+}
+
+
+
+//double evaluate_V_partial (gsl_matrix * m_partial, gsl_matrix * m)
+//{
+//    gsl_mabl_partial
+//}
+
+
+double evaluate_V_total (gsl_matrix * m) {
+    int i, N;
+    double r2_bond;
+    double x;
     // Calculate bond lengths
     // Calculate bond energy
     // Calculate bead-wall interaction
     // Calculate 
-    return 0.0;
+    N = m->size1;
+    gsl_vector_view bl_sub = gsl_vector_subvector(bl, 0, N-1);
+    bond_lengths(&bl_sub.vector, m);
+    gsl_vector_add_constant(&bl_sub.vector, -1.0);
+    gsl_blas_ddot(&bl_sub.vector, &bl_sub.vector, &r2_bond);
+
+    gsl_vector_view column = gsl_matrix_column(m, 2);
+    double V_wall = 0;
+    for (i = 0; i < N; i++) {
+        x = gsl_vector_get(&column.vector, i);
+        if (x <= 0)
+            V_wall += 1.0/0.0;
+        else
+            V_wall += V_prefactor*(twofifths*pow(s/x, 10) - pow(s/x, 4) - const1/pow(x + const2, 3));
+        //printf("V_wall_cumulative = %f, i = %d\n", V_wall, i);
+    }
+
+    double V = V_wall + 100.0*r2_bond;
+
+    return V;
+}
+
+void fix_bead0(gsl_matrix * m)
+{
+    gsl_matrix_set(m, 0, 0, 0.0);
+    gsl_matrix_set(m, 0, 1, 0.0);
+    gsl_matrix_set(m, 0, 2, 0.0);
 }
 
 
-void init_pdb (FILE * f)
-{
+void init_pdb (FILE * f) {
     fprintf(f, "AUTHOR    GENERATED BY Kyle Huston\n");
 }
 
 
-void mc_run (gsl_matrix * m, int nsteps, int write_stride)
-{
+void write_pdb (FILE * f, gsl_matrix * m) {
     int i;
+    int N = m->size1;
+    gsl_vector_view row;
+    fprintf(f, "CRYST1 9999.000 9999.000 9999.000  90.00  90.00  90.00 P 21 21 21    8\n");
+    for (i = 0; i < N; i++)
+    {
+        row = gsl_matrix_row(m, i);
+        fprintf(f, "ATOM  %5d    P LIG     1    %8.3f%8.3f%8.3f  1.00\n",
+                i,
+                gsl_vector_get(&row.vector, 0),
+                gsl_vector_get(&row.vector, 1),
+                gsl_vector_get(&row.vector, 2));
+    }
+    fprintf(f, "END\n");
+
+}
+
+
+void mc_run (gsl_matrix * m, int nsteps, int write_stride, int tethered) {
+    int i, k;
     gsl_matrix * m_new;
+    gsl_matrix_view m_partial;
+    gsl_matrix_view m_partial_new;
     double V_new;
     const int number_of_move_types = 4;
     int move_type;
@@ -374,41 +455,103 @@ void mc_run (gsl_matrix * m, int nsteps, int write_stride)
 
     m_new = gsl_matrix_alloc (N, m->size2);
 
-    V = evaluate_V (m);
-
     for (i = 0; i < nsteps; i++)
     {
-        move_type = gsl_rng_uniform_int(r, number_of_move_types);
 
         gsl_matrix_memcpy(m_new, m);
         
         if (i % (N+1) == 0)
         {
+            move_type = gsl_rng_uniform_int(r, number_of_move_types);
+            //printf ("debug: move_type=%d\n", move_type);
             if (move_type == 0)
+            {
                 pivot (m_new);
+                if (tethered) fix_bead0(m_new);
+                V = evaluate_V_total (m);
+                V_new = evaluate_V_total(m_new);
+            }
             else if (move_type == 1)
-                crankshaft (m_new);
+            {
+                k = crankshaft (m_new);
+                if (tethered) fix_bead0(m_new);
+
+                if (k == 0) {
+                   m_partial = gsl_matrix_submatrix(m, k, 0, 3, 3);
+                    m_partial_new = gsl_matrix_submatrix(m_new, k, 0, 3, 3);
+                }
+                else if (k == N-2) {
+                    m_partial = gsl_matrix_submatrix(m, k-1, 0, 3, 3);
+                    m_partial_new = gsl_matrix_submatrix(m_new, k-1, 0, 3, 3);
+                }
+                else {
+                    m_partial = gsl_matrix_submatrix(m, k-1, 0, 4, 3);
+                    m_partial_new = gsl_matrix_submatrix(m_new, k-1, 0, 4, 3);
+                }
+
+                V = evaluate_V_total (&m_partial.matrix);
+                V_new = evaluate_V_total(&m_partial_new.matrix);
+            }
             else if (move_type == 2)
+            {
                 slither (m_new);
+                if (tethered) fix_bead0(m_new);
+                V = evaluate_V_total (m);
+                V_new = evaluate_V_total(m_new);
+            }
             else if (move_type == 3)
-                end_rotate (m_new, 1);
+            {
+                k = end_rotate (m_new, 1);
+                if (tethered) fix_bead0(m_new);
+                if (k == 0) {
+                    m_partial = gsl_matrix_submatrix(m, k, 0, 2, 3);
+                    m_partial_new = gsl_matrix_submatrix(m_new, k, 0, 2, 3);
+                }
+                else {
+                    m_partial = gsl_matrix_submatrix(m, k-1, 0, 2, 3);
+                    m_partial_new = gsl_matrix_submatrix(m_new, k-1, 0, 2, 3);
+                }
+                V = evaluate_V_total (&m_partial.matrix);
+                V_new = evaluate_V_total(&m_partial_new.matrix);
+            }
         }
         else
         {
-            bead_diffusion (m_new, (i % (N+1))-1);
+            k = (i % (N+1))-1;
+            //printf("debug: bd %d\n", k);
+            bead_diffusion (m_new, k);
+            if (tethered) fix_bead0(m_new);
+            if (k == 0) {
+                m_partial = gsl_matrix_submatrix(m, k, 0, 2, 3);
+                m_partial_new = gsl_matrix_submatrix(m_new, k, 0, 2, 3);
+            }
+            else if (k == N-1) {
+                m_partial = gsl_matrix_submatrix(m, k-1, 0, 2, 3);
+                m_partial_new = gsl_matrix_submatrix(m_new, k-1, 0, 2, 3);
+            }
+            else {
+                m_partial = gsl_matrix_submatrix(m, k-1, 0, 3, 3);
+                m_partial_new = gsl_matrix_submatrix(m_new, k-1, 0, 3, 3);
+            }
+            V = evaluate_V_total(&m_partial.matrix);
+            V_new = evaluate_V_total(&m_partial_new.matrix);
         }
+        //printf("%f\n", evaluate_V_total(m));
 
-        V_new = evaluate_V(m_new);
 
+        //if (i % (N+1) == 0)
+        //{
+        //    printf("V_new = %f\n", V_new);
+        //    printf("V = %f\n", V);
+        //}
         if (gsl_rng_uniform(r) < pow(M_E, V - V_new))
         {
             gsl_matrix_memcpy(m, m_new);
-            V = V_new;
         }
 
         if (i % write_stride == 0)
         {
-            write_frame(m, "frame_%5d.pdb");
+            write_pdb(f, m);
         }
         
     }
@@ -421,15 +564,22 @@ void mc_run (gsl_matrix * m, int nsteps, int write_stride)
 
 int main (void)
 {
-  gsl_matrix * m = gsl_matrix_alloc (4, 3);
+  int N = 300;
+  s = 1.0;
+  eps = 1.0;
+  V_prefactor = 2.0*M_PI*eps;
+  const1 = sqrt(2.0)*pow(s, 3.0)/3.0;
+  const2 = s*0.61/sqrt(2.0);
+
+  gsl_matrix * m = gsl_matrix_alloc (N, 3);
 
   v = gsl_vector_alloc(3); // allocate global working vector
   B = gsl_matrix_alloc (m->size1, 3); // allocate global working matrix
   a = gsl_vector_alloc (3); // allocate global working vector
   Q = gsl_matrix_alloc (3, 3); // allocate global working matrix
   axis = gsl_vector_alloc (3); // allocate global working vector
-  y = gsl_vector_alloc (m->size1); // allocate global working vector
-  bl = gsl_vector_alloc (m->size1-1); // allocate global working vector
+  y = gsl_vector_alloc (N); // allocate global working vector
+  bl = gsl_vector_alloc (N-1); // allocate global working vector
   const gsl_rng_type * T;
 
   gsl_rng_env_setup();
@@ -438,7 +588,9 @@ int main (void)
   r = gsl_rng_alloc (T);
 
   init_matrix(m);
-  mc_run(m, 1000000, 1000);
+
+  mc_run(m, 100000*N, 100*N, false);
+  //mc_run(m, 100000*N, 100*N);
 
   gsl_matrix_free (m);
   gsl_vector_free(v);
