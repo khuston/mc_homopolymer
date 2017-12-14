@@ -1,11 +1,11 @@
-a.out: example.o
-	gcc -L/usr/local/lib example.o -lgsl -lgslcblas -lm
+a.out: mc_chain.o
+	gcc -L/usr/local/lib mc_chain.o -lgsl -lgslcblas -lm -o mc_chain
 
-example.o: example.c
-	gcc -Wall -I/usr/local/include -c example.c
+mc_chain.o: mc_chain.c
+	gcc -Wall -I/usr/local/include -c mc_chain.c
 
 clean:
 	rm -f *.o
 
 clean-all: clean
-	rm -f a.out
+	rm -f mc_chain
