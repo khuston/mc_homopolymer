@@ -1,3 +1,5 @@
 *.pdb
 *.o*
 a.out
+build
+.vscode
