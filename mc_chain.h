@@ -13,11 +13,11 @@ class MonteCarloChain
 {
   public:  
     MonteCarloChain() = delete;
-    MonteCarloChain(const int count, const double epsilon, const double sigma);
+    MonteCarloChain(const int& count, const double& epsilon, const double& sigma);
     ~MonteCarloChain();    
-    void set_logger(const Loggers::Logger*const logger); // todo: Separate logging into decorator.
-    void log(const Loggers::LogLevel message_level, const std::string message);
-    void run(const int nsteps, const int write_stride, const bool tethered, const std::string output_path);
+    void set_logger(const Loggers::Logger& logger); // todo: Separate logging into decorator.
+    void log(const Loggers::LogLevel& message_level, const std::string& message);
+    void run(const int& nsteps, const int& write_stride, const bool& tethered);
 
   private:
     static constexpr double twofifths = 2.0 / 5.0;
@@ -40,7 +40,7 @@ class MonteCarloChain
     double const2;
     int crankshaft_log2max;
 
-    const Loggers::Logger* logger;
+    Loggers::Logger& logger;
 
     void print_matrix(gsl_matrix *m);
     void print_vector(gsl_vector *v);

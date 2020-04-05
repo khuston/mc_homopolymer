@@ -48,12 +48,28 @@ class CombinedLogger : public Logger
 
 };
 
+class NullLogger : public Logger
+{
+  public:
+    NullLogger() {};
+    void log (const LogLevel& message_level, const std::string& message) const override {};
+};
+
 class LoggerFactory
 {
+  private:
+    static NullLogger* null_logger_instance;
+
   public:
     static std::unique_ptr<Logger> make_stdout_logger(const LogLevel& level);
     static std::unique_ptr<Logger> make_combined_logger(std::initializer_list<Logger> loggers_to_combine);
+    static NullLogger& get_null_logger();
+
+    LoggerFactory() = delete;
+    LoggerFactory(LoggerFactory const&) = delete;
+    void operator=(LoggerFactory const&) = delete;
 };
+
 } // namespace Loggers
 
 #endif

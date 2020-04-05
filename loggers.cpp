@@ -26,9 +26,9 @@ CombinedLogger::CombinedLogger()
 
 void CombinedLogger::log (const LogLevel& message_level, const std::string& message) const
 {
-    for (auto it = loggers->begin(); it != loggers->end(); ++it)
+    for (auto& it : *loggers)
     {
-        it->log(message_level, message);
+        it.log(message_level, message);
     }
 }
 
@@ -37,5 +37,12 @@ std::unique_ptr<Logger> LoggerFactory::make_stdout_logger(const LogLevel& level)
     std::unique_ptr<Logger> logger = std::make_unique<StdoutLogger>();
     logger->level = level;
     return logger;
+}
+
+NullLogger* LoggerFactory::null_logger_instance = new NullLogger();
+
+NullLogger& LoggerFactory::get_null_logger()
+{
+    return *null_logger_instance;
 }
 } // namespace Loggers
