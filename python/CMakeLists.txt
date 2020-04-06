@@ -5,6 +5,7 @@ include_directories(${Polymers_SOURCE_DIR}/include/mc_homopolymer)
 
 link_directories(${Polymers_SOURCE_DIR}/src)
 
-add_library(PyPolymers python_bindings.cpp)
+add_subdirectory(pybind11)
+pybind11_add_module(PyPolymers python_bindings.cpp)
 
-target_link_libraries(PyPolymers gsl gslcblas)
+target_link_libraries(PyPolymers PRIVATE gsl gslcblas)

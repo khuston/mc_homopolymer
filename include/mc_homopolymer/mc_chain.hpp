@@ -1,6 +1,6 @@
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_rng.h>
-#include "loggers.h"
+#include <loggers.hpp>
 #include <memory>
 #include <vector>
 

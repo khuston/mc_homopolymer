@@ -1,5 +1,5 @@
 #include <pybind11/pybind11.h>
-#include <mc_chain.h>
+#include <mc_chain.hpp>
 
 namespace py = pybind11;
 

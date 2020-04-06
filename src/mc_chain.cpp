@@ -1,4 +1,4 @@
-#include "mc_chain.h"
+#include <mc_chain.hpp>
 
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_matrix.h>
@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-#include "loggers.h"
+#include <loggers.hpp>
 #if __cplusplus > 201703L
 // C++20 code
 #include <format>
