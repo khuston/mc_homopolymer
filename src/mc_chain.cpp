@@ -1,4 +1,4 @@
-#include "mc_chain.h"
+#include <mc_chain.hpp>
 
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_matrix.h>
@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-#include "loggers.h"
+#include <loggers.hpp>
 #if __cplusplus > 201703L
 // C++20 code
 #include <format>
@@ -18,7 +18,8 @@
 
 namespace Polymers
 {
-MonteCarloChain::MonteCarloChain(const int count, const double epsilon, const double sigma)
+MonteCarloChain::MonteCarloChain(const int& count, const double& epsilon, const double& sigma)
+: logger(Loggers::LoggerFactory::get_null_logger())
 {
     // eps = 0.1;
     // s = 1.0;
@@ -27,7 +28,7 @@ MonteCarloChain::MonteCarloChain(const int count, const double epsilon, const do
     const2 = sigma * 0.61 / sqrt(2.0);
     crankshaft_log2max = (int)(std::log((double)(count - 2)) / std::log(2.0));
 
-    positions = gsl_matrix_alloc(count, 3);
+    positions = gsl_matrix_alloc(count, dimensions);
     v = gsl_vector_alloc(dimensions);
     B = gsl_matrix_alloc(count, dimensions);
     a = gsl_vector_alloc(dimensions);
@@ -46,8 +47,6 @@ MonteCarloChain::MonteCarloChain(const int count, const double epsilon, const do
     init_matrix(positions);
 
     int frame_number = 0;
-
-    logger = NULL;
 }
 
 MonteCarloChain::~MonteCarloChain()
@@ -60,17 +59,14 @@ MonteCarloChain::~MonteCarloChain()
     gsl_vector_free(bl);
 }
 
-void MonteCarloChain::set_logger(const Loggers::Logger*const logger)
+void MonteCarloChain::set_logger(const Loggers::Logger& logger)
 {
     this->logger = logger;
 }
 
-void MonteCarloChain::log(const Loggers::LogLevel message_level, const std::string message)
+void MonteCarloChain::log(const Loggers::LogLevel& message_level, const std::string& message)
 {
-    if (this->logger != NULL)
-    {
-        this->logger->log(message_level, message);
-    }
+    this->logger.log(message_level, message);
 }
 
 
@@ -92,7 +88,7 @@ void MonteCarloChain::print_vector(gsl_vector *v)
 void MonteCarloChain::set_random_vector(gsl_vector *u, double scale)
 {
     int j;
-    for (j = 0; j < 3; j++)
+    for (j = 0; j < dimensions; j++)
         gsl_vector_set(u, j, gsl_ran_gaussian(r, 1));
     gsl_vector_scale(u, scale / gsl_blas_dnrm2(u));
 }
@@ -449,7 +445,7 @@ void MonteCarloChain::fix_bead0(gsl_matrix *m)
     gsl_matrix_set(m, 0, 2, 0.0);
 }
 
-void MonteCarloChain::run(const int nsteps, const int write_stride, const bool tethered, const std::string output_path)
+void MonteCarloChain::run(const int& nsteps, const int& write_stride, const bool& tethered)
 {
     int i, k;
     gsl_matrix *m_new;
@@ -570,8 +566,8 @@ int main(int argc, char **argv)
 
     std::unique_ptr<Loggers::Logger> logger = Loggers::LoggerFactory::make_stdout_logger(Loggers::LogLevel::Debug);
 
-    chain.set_logger(logger.get());
-    chain.run(10000 * N, 1000 * N, false, "dump.pdb");
+    chain.set_logger(*logger);
+    chain.run(10000 * N, 1000 * N, false);
 
     return 0;
 }

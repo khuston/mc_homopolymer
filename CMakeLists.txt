@@ -1,10 +1,11 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.17)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/Modules")
 
 set (CMAKE_CXX_STANDARD 14)
 set (CMAKE_BUILD_TYPE Debug)
 
-project(mc_chain)
+project(Polymers)
 
-add_executable(mc_chain mc_chain.cpp loggers.cpp)
-
-target_link_libraries(mc_chain gsl gslcblas)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/src)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/python)
