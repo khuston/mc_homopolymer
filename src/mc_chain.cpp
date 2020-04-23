@@ -18,7 +18,7 @@
 
 namespace Polymers
 {
-MonteCarloChain::MonteCarloChain(const int& count, const double& epsilon, const double& sigma)
+MonteCarloChain::MonteCarloChain(const int& count, const double& epsilon, const double& sigma, const unsigned long int& seed)
 : logger(Loggers::LoggerFactory::get_null_logger())
 {
     // eps = 0.1;
@@ -42,18 +42,17 @@ MonteCarloChain::MonteCarloChain(const int& count, const double& epsilon, const 
     gsl_rng_env_setup();
 
     T = gsl_rng_default;
-    r = gsl_rng_alloc(T);
+    random_number_generator = gsl_rng_alloc(T);
+    gsl_rng_set(random_number_generator, seed);
 
     init_matrix(positions);
-
-    int frame_number = 0;
 }
 
 MonteCarloChain::~MonteCarloChain()
 {
     gsl_matrix_free(positions);
     gsl_vector_free(v);
-    gsl_rng_free(r);
+    gsl_rng_free(random_number_generator);
     gsl_matrix_free(B);
     gsl_vector_free(y);
     gsl_vector_free(bl);
@@ -89,7 +88,7 @@ void MonteCarloChain::set_random_vector(gsl_vector *u, double scale)
 {
     int j;
     for (j = 0; j < dimensions; j++)
-        gsl_vector_set(u, j, gsl_ran_gaussian(r, 1));
+        gsl_vector_set(u, j, gsl_ran_gaussian(random_number_generator, 1));
     gsl_vector_scale(u, scale / gsl_blas_dnrm2(u));
 }
 
@@ -108,7 +107,7 @@ void MonteCarloChain::bead_diffusion(gsl_matrix *m, int i)
 int MonteCarloChain::end_rotate(gsl_matrix *m, int rotation_type)
 {
     int i;
-    int direction = gsl_rng_uniform_int(r, 2);
+    int direction = gsl_rng_uniform_int(random_number_generator, 2);
     // Rotation type 1 produces a random orientation
     if (rotation_type == 1)
     {
@@ -132,7 +131,7 @@ int MonteCarloChain::end_rotate(gsl_matrix *m, int rotation_type)
 void MonteCarloChain::slither(gsl_matrix *m)
 {
     int i, j, k, N, offset;
-    int direction = gsl_rng_uniform_int(r, 2);
+    int direction = gsl_rng_uniform_int(random_number_generator, 2);
     N = m->size1;
     if (direction == 0)
     {
@@ -209,9 +208,9 @@ void MonteCarloChain::rotate_around_points(gsl_matrix *m, gsl_vector *a0, gsl_ve
 int MonteCarloChain::crankshaft(gsl_matrix *m)
 {
     int N = m->size1;
-    int n = pow(2.0, (double)(gsl_rng_uniform_int(r, crankshaft_log2max) + 1.0));
-    int k = gsl_rng_uniform_int(r, N - n);
-    double theta = 2 * M_PI * gsl_rng_uniform(r);
+    int n = pow(2.0, (double)(gsl_rng_uniform_int(random_number_generator, crankshaft_log2max) + 1.0));
+    int k = gsl_rng_uniform_int(random_number_generator, N - n);
+    double theta = 2 * M_PI * gsl_rng_uniform(random_number_generator);
 
     gsl_vector_view a0;
     gsl_vector_view ar;
@@ -251,10 +250,10 @@ void MonteCarloChain::pivot_z(gsl_matrix *m)
 {
     int i, j;
     int N = m->size1;
-    int k = gsl_rng_uniform_int(r, N - 2);
-    int direction = gsl_rng_uniform_int(r, 2);
+    int k = gsl_rng_uniform_int(random_number_generator, N - 2);
+    int direction = gsl_rng_uniform_int(random_number_generator, 2);
     const int num_symm_ops = 2;
-    int symmetry_operation = gsl_rng_uniform_int(r, num_symm_ops);
+    int symmetry_operation = gsl_rng_uniform_int(random_number_generator, num_symm_ops);
     double theta;
     int offset = 0;
     gsl_vector_view a1;
@@ -278,7 +277,7 @@ void MonteCarloChain::pivot_z(gsl_matrix *m)
             m_sub = gsl_matrix_submatrix(m, 0, 0, k, 3);
         }
 
-        theta = 2.0 * M_PI * gsl_rng_uniform(r);
+        theta = 2.0 * M_PI * gsl_rng_uniform(random_number_generator);
         a1 = gsl_matrix_row(m, k);
         gsl_vector_memcpy(v, &a1.vector);
         gsl_vector_set(v, 2, gsl_vector_get(v, 2) + 1.0);
@@ -290,10 +289,10 @@ int MonteCarloChain::pivot(gsl_matrix *m)
 {
     int i, j;
     int N = m->size1;
-    int k = gsl_rng_uniform_int(r, N - 2);
-    int direction = gsl_rng_uniform_int(r, 2);
+    int k = gsl_rng_uniform_int(random_number_generator, N - 2);
+    int direction = gsl_rng_uniform_int(random_number_generator, 2);
     const int num_symm_ops = 2;
-    int symmetry_operation = gsl_rng_uniform_int(r, num_symm_ops);
+    int symmetry_operation = gsl_rng_uniform_int(random_number_generator, num_symm_ops);
     double amap2;
     double theta;
     int offset = 0;
@@ -371,7 +370,7 @@ int MonteCarloChain::pivot(gsl_matrix *m)
         // a -> (a - a')  | a' = B[k-1]
         a1 = gsl_matrix_row(m, k);
         a2 = gsl_matrix_row(m, k + offset);
-        theta = 2.0 * M_PI * gsl_rng_uniform(r);
+        theta = 2.0 * M_PI * gsl_rng_uniform(random_number_generator);
         rotate_around_points(&m_sub.matrix, &a1.vector, &a2.vector, theta);
     }
     else
@@ -464,7 +463,7 @@ void MonteCarloChain::run(const int& nsteps, const bool& tethered)
 
         if (i % (N + 1) == 0)
         {
-            move_type = gsl_rng_uniform_int(r, number_of_move_types);
+            move_type = gsl_rng_uniform_int(random_number_generator, number_of_move_types);
             // printf ("debug: move_type=%d\n", move_type);
             if (move_type == 0)
             {
@@ -542,7 +541,7 @@ void MonteCarloChain::run(const int& nsteps, const bool& tethered)
             V = evaluate_V_total(&m_partial.matrix);
             V_new = evaluate_V_total(&m_partial_new.matrix);
         }
-        if (any_adsorbed(m_new) & (gsl_rng_uniform(r) < pow(M_E, V - V_new)))
+        if (any_adsorbed(m_new) & (gsl_rng_uniform(random_number_generator) < pow(M_E, V - V_new)))
         {
             gsl_matrix_memcpy(positions, m_new);
         }
@@ -553,7 +552,6 @@ void MonteCarloChain::run(const int& nsteps, const bool& tethered)
 
 int main(int argc, char **argv)
 {
-    int opt;
     int N;
     double epsilon;
     double sigma;
@@ -562,7 +560,7 @@ int main(int argc, char **argv)
     epsilon = 1;
     sigma = 1;
 
-    Polymers::MonteCarloChain chain = Polymers::MonteCarloChain(N, epsilon, sigma);
+    Polymers::MonteCarloChain chain = Polymers::MonteCarloChain(N, epsilon, sigma, gsl_rng_default_seed);
 
     std::unique_ptr<Loggers::Logger> logger = Loggers::LoggerFactory::make_stdout_logger(Loggers::LogLevel::Debug);
 

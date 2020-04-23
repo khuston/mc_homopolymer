@@ -13,7 +13,7 @@ class MonteCarloChain
 {
   public:  
     MonteCarloChain() = delete;
-    MonteCarloChain(const int& count, const double& epsilon, const double& sigma);
+    MonteCarloChain(const int& count, const double& epsilon, const double& sigma, const unsigned long int& seed);
     ~MonteCarloChain();    
     void set_logger(const Loggers::Logger& logger); // todo: Separate logging into decorator.
     void log(const Loggers::LogLevel& message_level, const std::string& message);
@@ -23,7 +23,7 @@ class MonteCarloChain
     static constexpr double twofifths = 2.0 / 5.0;
     static const int dimensions = 3;
 
-    gsl_rng *r;
+    gsl_rng *random_number_generator;
     gsl_vector *v;    // working vector (3)
     gsl_matrix *B;    // working matrix (N, 3)
     gsl_matrix *Q;    // working matrix (3, 3)
