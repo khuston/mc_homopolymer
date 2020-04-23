@@ -17,7 +17,7 @@ class MonteCarloChain
     ~MonteCarloChain();    
     void set_logger(const Loggers::Logger& logger); // todo: Separate logging into decorator.
     void log(const Loggers::LogLevel& message_level, const std::string& message);
-    void run(const int& nsteps, const int& write_stride, const bool& tethered);
+    void run(const int& nsteps, const bool& tethered);
 
   private:
     static constexpr double twofifths = 2.0 / 5.0;

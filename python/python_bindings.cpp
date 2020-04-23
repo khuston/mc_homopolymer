@@ -5,7 +5,7 @@ namespace py = pybind11;
 
 using namespace Polymers;
 
-PYBIND11_MODULE(PyPolymers, module) {
+PYBIND11_MODULE(Polymers, module) {
     module.doc() = "Polymers module";
     py::class_<MonteCarloChain>(module, "MonteCarloChain")
         .def(py::init<const int&, const double&, const double&>())

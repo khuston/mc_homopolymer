@@ -3,3 +3,7 @@
 a.out
 build
 .vscode
+.eggs
+*.egg-info
+venv
+*.so

@@ -445,7 +445,7 @@ void MonteCarloChain::fix_bead0(gsl_matrix *m)
     gsl_matrix_set(m, 0, 2, 0.0);
 }
 
-void MonteCarloChain::run(const int& nsteps, const int& write_stride, const bool& tethered)
+void MonteCarloChain::run(const int& nsteps, const bool& tethered)
 {
     int i, k;
     gsl_matrix *m_new;
@@ -567,7 +567,7 @@ int main(int argc, char **argv)
     std::unique_ptr<Loggers::Logger> logger = Loggers::LoggerFactory::make_stdout_logger(Loggers::LogLevel::Debug);
 
     chain.set_logger(*logger);
-    chain.run(10000 * N, 1000 * N, false);
+    chain.run(10000 * N, false);
 
     return 0;
 }
