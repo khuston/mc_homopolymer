@@ -38,6 +38,10 @@ ext_modules = [
     ),
 ]
 
+dev_requires = [
+    'pytest',
+]
+
 
 # As of Python 3.6, CCompiler has a `has_flag` method.
 # cf http://bugs.python.org/issue26689
@@ -108,6 +112,9 @@ setup(
     ext_modules=ext_modules,
     install_requires=['pybind11>=2.4'],
     setup_requires=['pybind11>=2.4'],
+    extras_require={
+        'dev': dev_requires,
+    },
     cmdclass={'build_ext': BuildExt},
     zip_safe=False,
 )
