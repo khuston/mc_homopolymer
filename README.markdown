@@ -1,6 +1,15 @@
 ## Purpose
 Sample configurations of a homopolymer, optionally at a sticky surface.
 
+## Build and Run Tests
+```bash
+git clone https://github.com/khuston/mc_homopolymer.git
+cd mc_homopolymer
+python -m venv venv
+venv/bin/pip install -e .[dev]
+pytest
+```
+
 ## Usage
 This repo is a work in progress. The usage at the moment has just one option and no way to get data out.
 
